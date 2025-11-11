@@ -47,3 +47,4 @@
     {{ return(column_rows | join('\nUNION ALL\n')) }}
 {% endmacro %}
 
+
