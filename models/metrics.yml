@@ -65,12 +65,49 @@ metrics:
   
   # ========== 质量相关指标 ==========
   
+  # 先定义基于 measure 的 simple metrics，供 ratio metrics 使用
+  - name: normal_transaction_count_metric
+    description: "正常交易数指标"
+    type: simple
+    type_params:
+      measure: normal_transaction_count
+    label: "正常交易数"
+    meta:
+      business_domain: "数据质量"
+      owner: "数据管理部"
+      unit: "笔"
+      
+  - name: abnormal_transaction_count_metric
+    description: "异常交易数指标"
+    type: simple
+    type_params:
+      measure: abnormal_transaction_count
+    label: "异常交易数"
+    meta:
+      business_domain: "数据质量"
+      owner: "数据管理部"
+      unit: "笔"
+      
+  - name: quality_normal_count_metric
+    description: "数据质量正常记录数指标"
+    type: simple
+    type_params:
+      measure: quality_normal_count
+    label: "质量正常记录数"
+    meta:
+      business_domain: "数据质量"
+      owner: "数据管理部"
+      unit: "笔"
+  
+  # Ratio metrics 引用其他 metrics
   - name: normal_transaction_rate
     description: "正常交易率"
     type: ratio
     type_params:
-      numerator: normal_transaction_count
-      denominator: transaction_count
+      numerator:
+        name: normal_transaction_count_metric
+      denominator:
+        name: daily_transactions
     label: "正常交易率"
     meta:
       business_domain: "数据质量"
@@ -81,8 +118,10 @@ metrics:
     description: "数据质量率"
     type: ratio
     type_params:
-      numerator: quality_normal_count
-      denominator: transaction_count
+      numerator:
+        name: quality_normal_count_metric
+      denominator:
+        name: daily_transactions
     label: "数据质量率"
     meta:
       business_domain: "数据质量"
@@ -93,8 +132,10 @@ metrics:
     description: "异常交易率"
     type: ratio
     type_params:
-      numerator: abnormal_transaction_count
-      denominator: transaction_count
+      numerator:
+        name: abnormal_transaction_count_metric
+      denominator:
+        name: daily_transactions
     label: "异常交易率"
     meta:
       business_domain: "数据质量"

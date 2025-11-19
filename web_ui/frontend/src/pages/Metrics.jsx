@@ -137,7 +137,7 @@ export default function Metrics() {
       const result = await api.post('/metrics/query/natural', {
         query: userMessage,
         use_llm: true, // 使用 LLM 解析
-        provider: 'deepseek' // 使用 DeepSeek
+        provider: 'local' // 使用本地 LLM Studio
       })
 
       // 添加系统回复到聊天历史
@@ -427,25 +427,93 @@ export default function Metrics() {
               {chatHistory.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
                   <RobotOutlined style={{ fontSize: 48, marginBottom: 16 }} />
-                  <div>👋 您好！我是智能查询助手</div>
-                  <div style={{ marginTop: 8, fontSize: 14 }}>
-                    您可以用自然语言查询指标，例如：
+                  <div style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>👋 您好！我是智能查询助手</div>
+                  <div style={{ marginTop: 8, fontSize: 14, marginBottom: 24 }}>
+                    您可以用自然语言查询指标数据，点击下方示例快速开始：
                   </div>
-                  <div style={{ marginTop: 16, textAlign: 'left', display: 'inline-block' }}>
-                    <Tag color="blue" style={{ margin: 4, cursor: 'pointer' }}
-                      onClick={() => setChatInput('查询最近7天的日收入，按城市分组')}>
-                      "查询最近7天的日收入，按城市分组"
-                    </Tag>
-                    <br />
-                    <Tag color="blue" style={{ margin: 4, cursor: 'pointer' }}
-                      onClick={() => setChatInput('显示北京本月的交易笔数')}>
-                      "显示北京本月的交易笔数"
-                    </Tag>
-                    <br />
-                    <Tag color="blue" style={{ margin: 4, cursor: 'pointer' }}
-                      onClick={() => setChatInput('查看昨天的正常交易率')}>
-                      "查看昨天的正常交易率"
-                    </Tag>
+                  
+                  {/* 基础查询示例 */}
+                  <div style={{ textAlign: 'left', marginBottom: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#1890ff' }}>
+                      📊 基础查询
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                      <Tag color="blue" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查询最近7天的日收入，按城市分组')}>
+                        查询最近7天的日收入，按城市分组
+                      </Tag>
+                      <Tag color="blue" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('显示北京本月的交易笔数')}>
+                        显示北京本月的交易笔数
+                      </Tag>
+                      <Tag color="blue" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查看昨天的正常交易率')}>
+                        查看昨天的正常交易率
+                      </Tag>
+                    </div>
+                  </div>
+
+                  {/* 复杂查询示例 */}
+                  <div style={{ textAlign: 'left', marginBottom: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#52c41a' }}>
+                      🔍 复杂查询
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                      <Tag color="green" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查询最近30天的平均交易金额，按城市和车型分组')}>
+                        查询最近30天的平均交易金额，按城市和车型分组
+                      </Tag>
+                      <Tag color="green" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('统计本月的交易笔数和总收入，按收费站和支付方式分组')}>
+                        统计本月的交易笔数和总收入，按收费站和支付方式分组
+                      </Tag>
+                      <Tag color="green" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查看最近一周的数据质量率和正常交易率，按城市分组')}>
+                        查看最近一周的数据质量率和正常交易率，按城市分组
+                      </Tag>
+                    </div>
+                  </div>
+
+                  {/* 时间范围查询示例 */}
+                  <div style={{ textAlign: 'left', marginBottom: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#fa8c16' }}>
+                      ⏰ 时间范围查询
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                      <Tag color="orange" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查询2025年1月1日到1月31日的日收入趋势，按城市分组')}>
+                        查询2025年1月1日到1月31日的日收入趋势，按城市分组
+                      </Tag>
+                      <Tag color="orange" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('显示最近3个月的交易笔数，按收费站类型分组')}>
+                        显示最近3个月的交易笔数，按收费站类型分组
+                      </Tag>
+                      <Tag color="orange" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查看本周的车辆数和平均交易金额')}>
+                        查看本周的车辆数和平均交易金额
+                      </Tag>
+                    </div>
+                  </div>
+
+                  {/* 多维度分析示例 */}
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#eb2f96' }}>
+                      📈 多维度分析
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                      <Tag color="magenta" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('分析最近7天各城市、各车型的收入分布情况')}>
+                        分析最近7天各城市、各车型的收入分布情况
+                      </Tag>
+                      <Tag color="magenta" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('对比不同支付方式在本月的交易笔数和收入')}>
+                        对比不同支付方式在本月的交易笔数和收入
+                      </Tag>
+                      <Tag color="magenta" style={{ margin: 0, cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                        onClick={() => setChatInput('查看各高速公路编码的日收入，按收费站分组')}>
+                        查看各高速公路编码的日收入，按收费站分组
+                      </Tag>
+                    </div>
                   </div>
                 </div>
               ) : (

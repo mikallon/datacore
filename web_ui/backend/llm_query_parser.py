@@ -234,9 +234,9 @@ class LLMQueryParserWithAPI:
         Args:
             available_metrics: 可用指标列表
             available_dimensions: 可用维度列表
-            api_key: LLM API Key
+            api_key: LLM API Key（本地 LLM Studio 通常不需要）
             model: 使用的模型名称
-            provider: 模型提供商 ("openai", "deepseek", "custom")
+            provider: 模型提供商 ("openai", "deepseek", "local", "lmstudio")
         """
         self.available_metrics = available_metrics
         self.available_dimensions = available_dimensions
@@ -272,19 +272,21 @@ class LLMQueryParserWithAPI:
             
             # 根据提供商调用不同的 LLM API
             llm_result = None
-            if self.provider == "deepseek":
+            if self.provider == "deepseek" or self.provider == "local" or self.provider == "lmstudio":
+                # 使用本地 LLM Studio 服务
                 llm_result = self._parse_with_deepseek(prompt, query)
             elif self.provider == "openai" or self.model.startswith('gpt'):
                 llm_result = self._parse_with_openai(prompt, query)
             else:
-                # 默认尝试 DeepSeek
+                # 默认尝试本地 LLM Studio
                 try:
                     llm_result = self._parse_with_deepseek(prompt, query)
                 except:
                     llm_result = self._parse_with_openai(prompt, query)
             
-            # 如果 LLM 返回了具体日期，使用规则解析器重新计算（更可靠）
-            if llm_result and ('start_date' in llm_result or 'end_date' in llm_result):
+            # 始终使用规则解析器计算时间范围（更可靠）
+            # 无论 LLM 返回什么，都使用规则解析器基于原始查询计算时间
+            if llm_result:
                 # 使用规则解析器计算时间范围（基于原始查询）
                 rule_parser = LLMQueryParser(self.available_metrics, self.available_dimensions)
                 rule_result = rule_parser.parse(query)
@@ -311,16 +313,10 @@ class LLMQueryParserWithAPI:
                 
                 return final_result
             
-            # 打印最终解析结果（纯 LLM）
-            if llm_result:
-                result_json = json.dumps(llm_result, ensure_ascii=False, indent=2)
-                logger.info("=" * 80)
-                logger.info("最终解析结果（纯 LLM）:")
-                logger.info("=" * 80)
-                logger.info(result_json)
-                logger.info("=" * 80)
-            
-            return llm_result
+            # 如果 LLM 解析失败，回退到规则解析
+            logger.warning("LLM 解析失败，使用规则解析")
+            parser = LLMQueryParser(self.available_metrics, self.available_dimensions)
+            return parser.parse(query)
         
         except Exception as e:
             logger.error(f"LLM 解析失败: {e}，使用规则解析")
@@ -471,27 +467,30 @@ class LLMQueryParserWithAPI:
             raise
     
     def _parse_with_deepseek(self, prompt: str, query: str) -> Dict[str, Any]:
-        """使用 DeepSeek API 解析"""
+        """使用本地 LLM Studio 服务解析（兼容 OpenAI API 格式）"""
         try:
             import requests
             
             # 打印发送给 LLM 的 prompt
             logger.info("=" * 80)
-            logger.info("发送给 DeepSeek LLM 的 Prompt:")
+            logger.info("发送给本地 LLM Studio 的 Prompt:")
             logger.info("=" * 80)
             logger.info(prompt)
             logger.info("=" * 80)
             
-            # DeepSeek API 端点
-            api_url = "https://api.deepseek.com/v1/chat/completions"
+            # 本地 LLM Studio API 端点（OpenAI 兼容格式）
+            api_url = "http://192.168.30.162:1234/v1/chat/completions"
             
             headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}"
+                "Content-Type": "application/json"
             }
             
+            # LLM Studio 通常不需要 API Key，如果需要可以添加
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            
             payload = {
-                "model": self.model,  # 如 "deepseek-chat"
+                "model": self.model,  # 使用配置的模型名称
                 "messages": [
                     {"role": "system", "content": "你是一个数据查询助手，将自然语言转换为结构化查询。"},
                     {"role": "user", "content": prompt}
@@ -508,7 +507,7 @@ class LLMQueryParserWithAPI:
             
             # 打印 LLM 返回的结果
             logger.info("=" * 80)
-            logger.info("DeepSeek LLM 返回的原始结果:")
+            logger.info("本地 LLM Studio 返回的原始结果:")
             logger.info("=" * 80)
             logger.info(result_text)
             logger.info("=" * 80)
@@ -521,13 +520,13 @@ class LLMQueryParserWithAPI:
                 parsed_result = self._validate_and_fix_dates(parsed_result)
                 return parsed_result
             else:
-                raise ValueError("无法从 DeepSeek 响应中提取 JSON")
+                raise ValueError("无法从 LLM 响应中提取 JSON")
         
         except ImportError:
             logger.error("requests 库未安装，请运行: pip install requests")
             raise
         except Exception as e:
-            logger.error(f"DeepSeek API 调用失败: {e}")
+            logger.error(f"本地 LLM Studio API 调用失败: {e}")
             raise
     
     def _validate_and_fix_dates(self, parsed_result: Dict[str, Any]) -> Dict[str, Any]:

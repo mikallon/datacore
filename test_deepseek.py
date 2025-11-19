@@ -1,27 +1,19 @@
 #!/usr/bin/env python3
 """
-测试 DeepSeek API 集成
+测试本地 LLM Studio API 集成
 
 使用方法：
-1. 设置环境变量：
-   export DEEPSEEK_API_KEY="your-api-key"
-   export LLM_PROVIDER="deepseek"
+1. 确保 LM Studio 服务运行在 http://192.168.30.162:1234
+2. 设置环境变量（可选）：
+   export LLM_PROVIDER="local"
+   export LLM_MODEL="your-model-name"
 
-2. 或者运行：
-   source setup_deepseek.sh
+3. 运行测试：
    python3 test_deepseek.py
 """
 import os
 import sys
 sys.path.insert(0, 'web_ui/backend')
-
-# 从环境变量读取 API Key（不要硬编码到代码中）
-api_key = os.getenv('DEEPSEEK_API_KEY')
-if not api_key:
-    print("❌ 错误：未设置 DEEPSEEK_API_KEY 环境变量")
-    print("   请运行: source setup_deepseek.sh")
-    print("   或者设置: export DEEPSEEK_API_KEY='your-api-key'")
-    sys.exit(1)
 
 from llm_query_parser import LLMQueryParserWithAPI
 
@@ -35,19 +27,21 @@ metrics = [
 dimensions = ['city', 'station_name', 'vehicle_type_name']
 
 print("=" * 60)
-print("测试 DeepSeek API 集成")
+print("测试本地 LLM Studio API 集成")
+print("=" * 60)
+print(f"LLM 服务地址: http://192.168.30.162:1234")
 print("=" * 60)
 
 try:
     parser = LLMQueryParserWithAPI(
         available_metrics=metrics,
         available_dimensions=dimensions,
-        api_key=api_key,
-        model=os.getenv('DEEPSEEK_MODEL', 'deepseek-chat'),
-        provider=os.getenv('LLM_PROVIDER', 'deepseek')
+        api_key='not-required',  # 本地 LLM Studio 通常不需要 API Key
+        model=os.getenv('LLM_MODEL', 'local-model'),
+        provider='local'  # 使用本地 LLM Studio
     )
     
-    print("\n✅ DeepSeek 解析器初始化成功")
+    print("\n✅ 本地 LLM Studio 解析器初始化成功")
     
     # 测试查询
     test_query = "查询最近7天的日收入，按城市分组"
@@ -64,5 +58,9 @@ try:
     
 except Exception as e:
     print(f"\n❌ 测试失败: {e}")
+    print("\n提示：")
+    print("1. 确保 LM Studio 服务运行在 http://192.168.30.162:1234")
+    print("2. 检查网络连接是否正常")
+    print("3. 查看 LM Studio 的日志输出")
     import traceback
     traceback.print_exc()

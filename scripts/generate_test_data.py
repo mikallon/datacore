@@ -105,21 +105,24 @@ conn.execute("""
     );
 """)
 
-# 插入收费站数据
+# 清空并插入收费站数据
+conn.execute("DELETE FROM raw.toll_station")
 conn.executemany("""
     INSERT INTO raw.toll_station 
     (station_id, station_name, city, highway_code, station_type, open_date)
     VALUES (?, ?, ?, ?, ?, ?)
 """, toll_stations)
 
-# 插入车型字典数据
+# 清空并插入车型字典数据
+conn.execute("DELETE FROM raw.vehicle_type_dict")
 conn.executemany("""
     INSERT INTO raw.vehicle_type_dict 
     (vehicle_type_code, vehicle_type_name, vehicle_type_desc, toll_rate_multiplier)
     VALUES (?, ?, ?, ?)
 """, vehicle_types)
 
-# 插入支付方式字典数据
+# 清空并插入支付方式字典数据
+conn.execute("DELETE FROM raw.payment_method_dict")
 conn.executemany("""
     INSERT INTO raw.payment_method_dict 
     (payment_method_code, payment_method_name, payment_method_desc)
@@ -142,11 +145,11 @@ def generate_transaction_id(date, index):
     """生成交易ID"""
     return f"TXN{date.strftime('%Y%m%d')}{str(index).zfill(8)}"
 
-# 生成最近30天的交易数据
-base_date = datetime.now() - timedelta(days=30)
+# 生成最近40天的交易数据
+base_date = datetime.now() - timedelta(days=40)
 transactions = []
 
-for day in range(30):
+for day in range(40):  # 最近40天
     current_date = base_date + timedelta(days=day)
     # 每天生成1000-5000条交易
     num_transactions = random.randint(1000, 5000)
@@ -215,8 +218,9 @@ for day in range(30):
             current_date
         ))
 
-# 批量插入交易数据
-print(f"正在插入 {len(transactions)} 条交易数据...")
+# 清空并批量插入交易数据
+print(f"正在清空旧数据并插入 {len(transactions)} 条交易数据...")
+conn.execute("DELETE FROM raw.toll_transaction")
 conn.executemany("""
     INSERT INTO raw.toll_transaction 
     (transaction_id, station_id, lane_id, vehicle_plate, vehicle_type_code,

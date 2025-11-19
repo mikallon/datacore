@@ -1,15 +1,28 @@
 """
 MetricFlow 客户端模块
-使用 MetricFlow 命令行工具生成 SQL 查询
+优先使用 MetricFlow Python API 生成 SQL 查询，失败时回退到命令行工具
 """
 import subprocess
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+# 尝试导入 MetricFlow Python API
+try:
+    from dbt_metricflow.cli.dbt_connectors.dbt_config_accessor import dbtProjectMetadata, dbtArtifacts
+    from dbt_metricflow.cli.dbt_connectors.adapter_backed_client import AdapterBackedSqlClient
+    from metricflow_semantics.model.semantic_manifest_lookup import SemanticManifestLookup
+    from metricflow.engine.metricflow_engine import MetricFlowEngine, MetricFlowQueryRequest
+    METRICFLOW_API_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"MetricFlow Python API 不可用，将使用命令行工具: {e}")
+    METRICFLOW_API_AVAILABLE = False
 
 class MetricFlowClient:
     """MetricFlow 客户端，用于生成 SQL 查询"""
@@ -24,6 +37,55 @@ class MetricFlowClient:
         """
         self.project_dir = os.path.abspath(project_dir)
         self.profiles_dir = os.path.abspath(profiles_dir)
+        self._mf_engine: Optional[MetricFlowEngine] = None
+        self._use_api = METRICFLOW_API_AVAILABLE
+        
+    def _init_mf_engine(self) -> Optional[MetricFlowEngine]:
+        """初始化 MetricFlowEngine（使用 Python API）"""
+        if not self._use_api:
+            return None
+            
+        if self._mf_engine is not None:
+            return self._mf_engine
+            
+        try:
+            # 检查 semantic_manifest.json 是否存在
+            manifest_path = Path(self.project_dir) / "target" / "semantic_manifest.json"
+            if not manifest_path.exists():
+                logger.warning(f"semantic_manifest.json 不存在，请先运行 `dbt parse` 或 `dbt build`")
+                logger.info("回退到命令行工具模式")
+                self._use_api = False
+                return None
+            
+            # 加载 dbt 项目元数据
+            project_metadata = dbtProjectMetadata.load_from_paths(
+                profiles_path=Path(self.profiles_dir),
+                project_path=Path(self.project_dir)
+            )
+            
+            # 加载 dbt artifacts（包括 adapter 和 semantic_manifest）
+            dbt_artifacts = dbtArtifacts.load_from_project_metadata(project_metadata)
+            
+            # 创建 SemanticManifestLookup
+            semantic_manifest_lookup = SemanticManifestLookup(dbt_artifacts.semantic_manifest)
+            
+            # 创建 SqlClient（使用 dbt adapter）
+            sql_client = AdapterBackedSqlClient(dbt_artifacts.adapter)
+            
+            # 初始化 MetricFlowEngine
+            self._mf_engine = MetricFlowEngine(
+                semantic_manifest_lookup=semantic_manifest_lookup,
+                sql_client=sql_client
+            )
+            
+            logger.info("✅ MetricFlow Python API 初始化成功")
+            return self._mf_engine
+            
+        except Exception as e:
+            logger.warning(f"MetricFlow Python API 初始化失败: {e}")
+            logger.info("回退到命令行工具模式")
+            self._use_api = False
+            return None
         
     def list_metrics(self) -> List[Dict[str, Any]]:
         """
@@ -32,6 +94,26 @@ class MetricFlowClient:
         Returns:
             指标列表
         """
+        # 尝试使用 Python API
+        mf_engine = self._init_mf_engine()
+        if mf_engine is not None:
+            try:
+                # 使用 MetricFlowEngine 的 list_metrics 方法
+                metrics = mf_engine.list_metrics()
+                return [
+                    {
+                        'name': metric.name,  # metric.name 是字符串
+                        'label': metric.label or metric.name,
+                        'description': metric.description or ''
+                    }
+                    for metric in metrics
+                ]
+            except Exception as e:
+                logger.warning(f"使用 Python API 列出指标失败: {e}，回退到命令行工具")
+                import traceback
+                logger.debug(traceback.format_exc())
+        
+        # 回退到命令行工具
         try:
             result = subprocess.run(
                 ['mf', 'list', 'metrics'],
@@ -106,6 +188,61 @@ class MetricFlowClient:
         Returns:
             包含 SQL 和元数据的字典
         """
+        # 尝试使用 Python API
+        mf_engine = self._init_mf_engine()
+        if mf_engine is not None:
+            try:
+                # 解析时间字符串为 datetime 对象
+                time_constraint_start = None
+                time_constraint_end = None
+                if start_time:
+                    try:
+                        # 尝试解析 ISO 8601 格式
+                        if 'T' in start_time:
+                            time_constraint_start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                        else:
+                            time_constraint_start = datetime.strptime(start_time, '%Y-%m-%d')
+                    except ValueError:
+                        logger.warning(f"无法解析开始时间: {start_time}")
+                
+                if end_time:
+                    try:
+                        if 'T' in end_time:
+                            time_constraint_end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                        else:
+                            time_constraint_end = datetime.strptime(end_time, '%Y-%m-%d')
+                    except ValueError:
+                        logger.warning(f"无法解析结束时间: {end_time}")
+                
+                # 构建 MetricFlowQueryRequest
+                mf_request = MetricFlowQueryRequest.create_with_random_request_id(
+                    metric_names=metrics,
+                    group_by_names=group_by,
+                    time_constraint_start=time_constraint_start,
+                    time_constraint_end=time_constraint_end,
+                    where_constraints=where,
+                    limit=limit
+                )
+                
+                # 使用 explain 方法生成 SQL（不执行）
+                explain_result = mf_engine.explain(mf_request=mf_request)
+                
+                # 提取 SQL 语句
+                sql = explain_result.sql_statement.without_descriptions.sql
+                
+                logger.info("✅ 使用 MetricFlow Python API 生成 SQL 成功")
+                return {
+                    'sql': sql,
+                    'raw_output': sql,  # 为了兼容性
+                    'success': True
+                }
+                
+            except Exception as e:
+                logger.warning(f"使用 Python API 生成 SQL 失败: {e}，回退到命令行工具")
+                import traceback
+                logger.debug(traceback.format_exc())
+        
+        # 回退到命令行工具
         try:
             # 构建 mf query 命令
             cmd = ['mf', 'query']

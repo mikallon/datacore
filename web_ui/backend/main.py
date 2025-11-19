@@ -945,21 +945,27 @@ async def query_metric_natural(nl_query: NaturalLanguageQuery):
         
         # 选择解析器
         if nl_query.use_llm:
-            # 使用 LLM 解析（需要配置 API Key）
-            # 可以从环境变量读取，支持 OpenAI 和 DeepSeek
-            api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY') or os.getenv('LLM_API_KEY')
+            # 使用 LLM 解析（支持 OpenAI、本地 LLM Studio 等）
+            # 可以从环境变量读取
+            api_key = os.getenv('LLM_API_KEY') or os.getenv('OPENAI_API_KEY') or os.getenv('DEEPSEEK_API_KEY')
             
             # 根据参数或环境变量选择提供商
-            provider = nl_query.provider or os.getenv('LLM_PROVIDER', 'openai').lower()
-            if provider == 'deepseek' or os.getenv('DEEPSEEK_API_KEY'):
-                provider = 'deepseek'
-                model = nl_query.model or os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
-                # 确保使用 DeepSeek API Key
-                if not api_key or not os.getenv('DEEPSEEK_API_KEY'):
-                    api_key = os.getenv('DEEPSEEK_API_KEY')
-            else:
+            provider = nl_query.provider or os.getenv('LLM_PROVIDER', 'local').lower()
+            
+            # 本地 LLM Studio 服务（默认）
+            if provider == 'local' or provider == 'lmstudio' or provider == 'deepseek':
+                provider = 'local'  # 统一使用 local 标识
+                model = nl_query.model or os.getenv('LLM_MODEL', 'local-model')
+                # 本地 LLM Studio 通常不需要 API Key
+                api_key = api_key or 'not-required'
+            elif provider == 'openai':
                 provider = 'openai'
                 model = nl_query.model or os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+            else:
+                # 默认使用本地 LLM Studio
+                provider = 'local'
+                model = nl_query.model or os.getenv('LLM_MODEL', 'local-model')
+                api_key = api_key or 'not-required'
             
             logger.info(f"使用 LLM 解析自然语言查询: provider={provider}, model={model}, query={nl_query.query}")
             

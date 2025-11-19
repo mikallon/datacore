@@ -6,6 +6,16 @@ semantic_models:
     description: "收费收入语义模型，基于日收费收入汇总表"
     model: ref('dws_toll_revenue_daily')
     
+    # 默认配置
+    defaults:
+      agg_time_dimension: transaction_date
+    
+    # 定义实体（Entities）- 用于关联和分组
+    entities:
+      - name: transaction
+        type: primary
+        expr: transaction_date || '_' || station_id  # 组合键作为主实体
+    
     # 定义度量（Measures）- 可聚合的数值字段
     measures:
       - name: total_revenue

@@ -1,6 +1,36 @@
 version: 2
 
 models:
+  - name: mf_time_spine
+    description: "MetricFlow 时间脊柱表，用于语义层时间维度填充"
+    time_spine:
+      standard_granularity_column: date_day
+      custom_granularities:
+        - name: date_week
+        - name: date_month
+        - name: date_quarter
+        - name: date_year
+    columns:
+      - name: date_day
+        granularity: day
+        description: "日期（日粒度）"
+      - name: date_week
+        granularity: week
+        description: "日期（周粒度）"
+      - name: date_month
+        granularity: month
+        description: "日期（月粒度）"
+      - name: date_quarter
+        granularity: quarter
+        description: "日期（季度粒度）"
+      - name: date_year
+        granularity: year
+        description: "日期（年粒度）"
+    meta:
+      table_name_cn: "MetricFlow 时间脊柱表"
+      business_domain: "数据管理"
+      data_source: "MetricFlow"
+      
   - name: meta_table_info
     description: "表信息元数据表，记录所有数据表的元数据信息"
     columns:
